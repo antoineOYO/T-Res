@@ -516,6 +516,7 @@ class Pipeline:
 
         # Aggregate mentions:
         mentions = ner.aggregate_mentions(procpreds, "pred")
+        
         return mentions
 
     def format_prediction(
