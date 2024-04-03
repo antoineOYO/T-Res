@@ -6,7 +6,10 @@ from typing import List, Literal, Optional, Tuple
 
 import pandas as pd
 from DeezyMatch import candidate_ranker
+
 from pandarallel import pandarallel
+pandarallel.initialize(progress_bar=True, nb_workers=8)
+
 from pyxdameraulevenshtein import normalized_damerau_levenshtein_distance
 
 from ..utils import deezy_processing
@@ -457,10 +460,16 @@ class Ranker:
             mention_df = pd.DataFrame({"mentions": self.mentions_to_wikidata.keys()})
 
             if damlev:
+                # mention_df["score"] = mention_df.apply(
+                #     lambda row: self.damlev_dist(query, row), axis=1
+                # )
                 mention_df["score"] = mention_df.parallel_apply(
                     lambda row: self.damlev_dist(query, row), axis=1
                 )
             else:
+                # mention_df["score"] = mention_df.apply(
+                #     lambda row: self.check_if_contained(query, row), axis=1
+                # )
                 mention_df["score"] = mention_df.parallel_apply(
                     lambda row: self.check_if_contained(query, row), axis=1
                 )
