@@ -197,7 +197,8 @@ def rank_candidates(rel_json: dict, wk_cands: dict, mentions_to_wikidata: dict) 
             cands = []
             tmp_cands = []
             max_cand_freq = 0
-            ranker_cands = wk_cands.get(mention_dict["mention"], dict())
+            #ranker_cands = wk_cands.get(mention_dict["mention"], dict())
+            ranker_cands = wk_cands[0].get(mention_dict["mention"], dict())
             for c in ranker_cands:
                 # DeezyMatch confidence score (cosine similarity):
                 cand_selection_score = ranker_cands[c]["Score"]
