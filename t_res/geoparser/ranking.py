@@ -563,7 +563,7 @@ class Ranker:
                 output_path=os.path.join(dm_path, "ranking", dm_output),
                 pretrained_model_path=pretrained_model_path,
                 pretrained_vocab_path=pretrained_vocab_path,
-            )
+            ) # candidate_ranker returns a dataframe : output_pd
 
             for _, row in candidates.iterrows():
                 # Reverse cosine distance to cosine similarity:
@@ -581,6 +581,9 @@ class Ranker:
                 else:
                     returned_cands = row["cosine_dist"]
                     returned_cands = {k: 1 - returned_cands[k] for k in returned_cands}
+
+                # display the dataframe  returned_cands in html
+                #print(returned_cands.to_html())
 
                 cands_dict[row["query"]] = returned_cands
 

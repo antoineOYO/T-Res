@@ -1,12 +1,16 @@
 import os
 import sys
 from pathlib import Path
+from tracemalloc import start
 from typing import List, Optional, Tuple
 
 from sentence_splitter import split_text_into_sentences
 
 from ..utils import ner, rel_utils
 from . import linking, ranking, recogniser
+
+import spacy
+from spacy.tokens import DocBin, Doc
 
 
 class Pipeline:
@@ -73,7 +77,7 @@ class Pipeline:
 
     def __init__(
         self,
-        geodeNER = None,
+        geodeNERpath = '../resources/fr_spacy_custom_spancat_edda',
         myner: Optional[recogniser.Recogniser] = None,
         myranker: Optional[ranking.Ranker] = None,
         mylinker: Optional[linking.Linker] = None,
@@ -87,8 +91,9 @@ class Pipeline:
         ############################################################
         # OUR NER MODEL
 
-        if geodeNER :
-            self.myner = geodeNER
+        if geodeNERpath :
+            self.spacy_model = spacy.load(geodeNERpath)
+            Doc.set_extension("metadata", default={}, force=True)
 
         else :
             self.myner = myner
@@ -162,13 +167,16 @@ class Pipeline:
 
     def run_sentence(
         self,
+        
         sentence: str,
         sent_idx: Optional[int] = 0,
         context: Optional[Tuple[str, str]] = ("", ""),
         place: Optional[str] = "",
         place_wqid: Optional[str] = "",
         postprocess_output: Optional[bool] = True,
-        without_microtoponyms: Optional[bool] = False,
+        without_microtoponyms: Optional[bool] = True,
+        HEAD = None,
+        verbose = False,
     ) -> List[dict]:
         """
         Runs the pipeline on a single sentence.
@@ -233,21 +241,28 @@ class Pipeline:
             ID.
         """
 
-        mentions = self.run_sentence_recognition(sentence)
+
+        mentions = self.run_sentence_recognition(sentence, edda_head=HEAD)
 
         # List of mentions for the ranker:
         rmentions = []
         if without_microtoponyms:
             rmentions = [
-                {"mention": y["mention"]} for y in mentions if y["ner_label"] == "LOC"
+                {"mention": y["mention"]} for y in mentions if y["entity"] == "B-LOC"
             ]
         else:
             rmentions = [{"mention": y["mention"]} for y in mentions]
+
 
         # Perform candidate ranking:
         wk_cands, self.myranker.already_collected_cands = self.myranker.find_candidates(
             rmentions
         )
+
+        if verbose :
+            print('mentions :', mentions)
+            print('rmentions :', rmentions)
+            print('wk_cands :', wk_cands)
 
         mentions_dataset = dict()
         mentions_dataset["linking"] = []
@@ -480,6 +495,7 @@ class Pipeline:
             instructions on how to set that up.
 
         """
+        
         # Split the text into its sentences:
         sentences = split_text_into_sentences(text, language="en")
 
@@ -511,20 +527,83 @@ class Pipeline:
 
         return document_dataset
 
-    def run_sentence_recognition(self, sentence) -> List[dict]:
+    def run_sentence_recognition(self, sentence, edda_head) -> List[dict]:
+        """
+        transforms my spacy dict into a list of dict :
+
+        [{'entity': 'O',
+        'score': 0.9999761581420898,
+        'word': 'A',
+        'start': 0,
+        'end': 1},
+        ... ,
+        {'entity': 'B-LOC',
+        'score': 0.9996446371078491,
+        'word': 'Sheffield',
+        'start': 74,
+        'end': 83},
+        ...
+        {'entity': 'O',
+        'score': 0.9999758005142212,
+        'word': '.',
+        'start': 83,
+        'end': 84}]
+        """
+
+        if self.spacy_model :
+
+            #homemade NER :
+            spacydoc = self.spacy_model(sentence)
+            model_outputs = dict(spacydoc._.metadata, **spacydoc.to_json())
+
+            # formated output list :
+            output_list = []
+
+            # we manually append the head to the list of mentions
+            if edda_head :
+                # start and end position of string 'HEAD' within 'sentence'
+                start_head = sentence.find(edda_head)
+                end_head = start_head + len(edda_head) - 1
+                output_list.append({'entity': 'B-LOC',
+                                    'score': 1,
+                                    'mention':edda_head,
+                                    'start': start_head,
+                                    'end': end_head
+                                    }
+                )
+
+            for span in model_outputs['spans']['sc']:
+                token = model_outputs['text'][span['start']:span['end']]
+                
+                # remove leading lowercase characters, symbols and spaces
+                # because spacy spancat still makes errors
+                shift = 0
+                if span['label'] == 'NP-Spatial':
+                    while token and (token[0].islower() or not token[0].isalpha() or token[0] == ' '):
+                        token = token[1:]
+                        shift += 1
+                    span_dict = {'entity': 'B-LOC',
+                                'score': 1,
+                                'mention': token,
+                                'start': span['start'] + shift,
+                                'end': span['end']
+                                }
+                    output_list.append(span_dict)
+    
+        # ORIGINAL CODE : 
         # Get predictions:
-        predictions = self.myner.ner_predict(sentence)
+        # predictions = self.myner.ner_predict(sentence)
 
-        # Process predictions:
-        procpreds = [
-            [x["word"], x["entity"], "O", x["start"], x["end"], x["score"]]
-            for x in predictions
-        ]
+        # # Process predictions:
+        # procpreds = [
+        #     [x["word"], x["entity"], "O", x["start"], x["end"], x["score"]]
+        #     for x in predictions
+        # ]
 
-        # Aggregate mentions:
-        mentions = ner.aggregate_mentions(procpreds, "pred")
+        # # Aggregate mentions:
+        # mentions = ner.aggregate_mentions(procpreds, "pred")
         
-        return mentions
+        return output_list
 
     def format_prediction(
         self,
@@ -536,18 +615,27 @@ class Pipeline:
         place: Optional[str] = "",
         place_wqid: Optional[str] = "",
     ) -> dict:
+        """
+        ner returns a listd of dicts like this :
+        {'entity': 'O',
+        'score': 0.9999758005142212,
+        'word': '.',
+        'start': 83,
+        'end': 84}]
+        """
+        
         prediction = dict()
         prediction["mention"] = mention["mention"]
         prediction["context"] = context
         prediction["candidates"] = []
         prediction["gold"] = ["NONE"]
-        prediction["ner_score"] = mention["ner_score"]
-        prediction["pos"] = mention["start_char"]
+        prediction["ner_score"] = mention["score"]
+        prediction["pos"] = mention["start"]
         prediction["sent_idx"] = sent_idx
-        prediction["end_pos"] = mention["end_char"]
+        prediction["end_pos"] = mention["end"]
         prediction["ngram"] = mention["mention"]
-        prediction["conf_md"] = mention["ner_score"]
-        prediction["tag"] = mention["ner_label"]
+        prediction["conf_md"] = mention["score"]
+        prediction["tag"] = mention["entity"]
         prediction["sentence"] = sentence
         prediction["place"] = place
         prediction["place_wqid"] = place_wqid

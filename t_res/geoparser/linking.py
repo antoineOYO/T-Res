@@ -394,6 +394,7 @@ class Linker:
                 }
         """
         if self.method == "reldisamb":
+            
             # Generate ED model name:
             linker_name = myranker.method
             if myranker.method == "deezymatch":
