@@ -89,12 +89,13 @@ class Pipeline:
         """
         ############################################################
         ############################################################
+        
         # OUR NER MODEL
-
         if geodeNERpath :
             self.spacy_model = spacy.load(geodeNERpath)
             Doc.set_extension("metadata", default={}, force=True)
 
+        # their BERT based NER model
         else :
             self.myner = myner
             # If myner is None, instantiate the default Recogniser.
