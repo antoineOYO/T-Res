@@ -325,14 +325,20 @@ class Ranker:
             perfect match score of ``1.0`` to the mention. Otherwise, an empty
             dictionary is assigned as the candidate list for the mention.
         """
+        ####################################################################################
+        # lower case all keys from the dict self.mentions_to_wikidata 
+        lower_mentions_to_mentions = {k.lower(): k for k in self.mentions_to_wikidata.keys()}
+        ####################################################################################
+        
         candidates = {}
         for query in queries:
             if query in self.already_collected_cands:
                 candidates[query] = self.already_collected_cands[query]
             else:
-                if query in self.mentions_to_wikidata:
-                    candidates[query] = {query: 1.0}
-                    self.already_collected_cands[query] = {query: 1.0}
+                formatted_query = lower_mentions_to_mentions.get(query.lower())
+                if formatted_query:
+                    candidates[query] = {formatted_query: 1.0}
+                    self.already_collected_cands[query] = {formatted_query: 1.0}
                 else:
                     candidates[query] = {}
                     self.already_collected_cands[query] = {}
