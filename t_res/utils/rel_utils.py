@@ -200,7 +200,7 @@ def rank_candidates(rel_json: dict, wk_cands: dict, mentions_to_wikidata: dict) 
             
             #############################################################
             # CORRECTION : wk_cand IS SOMETIMES A TUPLE, SOMETIMES NOT
-            if len(wk_cands) > 1:
+            if isinstance(wk_cands, tuple):
                 ranker_cands = wk_cands[0].get(mention_dict["mention"], dict())
             else :
                 ranker_cands = wk_cands.get(mention_dict["mention"], dict())
