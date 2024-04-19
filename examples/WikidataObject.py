@@ -51,18 +51,57 @@ class WikidataObject:
             print(e)
             return None
 
+    # def _get_label(self, lang='fr'):
+    #     """
+    #     default lang = fr
+    #     if a language is provide,
+    #         returns the label (one !) of the item in the given language
+    #     if lang='all',
+    #         returns a dict of all labels 
+    #     """
+    #     if self.label:
+    #         return self.label
+    #     if self.json:
+    #         if lang == 'all':
+    #             try:
+    #                 return self.json['entities'][self.uri]['labels']
+    #             except KeyError:
+    #                 pass
+    #         else:
+    #             try:
+    #                 return self.json['entities'][self.uri]['labels'][lang]['value']
+    #             except KeyError:
+    #                 pass
+    #     json_data = self._request_json()
+    #     if json_data:
+    #         return self._get_label()
+    #     return None
+    
     def _get_label(self, lang='fr'):
+        """
+        default lang = fr
+        if a language is provided,
+            returns the label (one!) of the item in the given language
+        if lang='all',
+            returns a dict of all labels 
+        """
         if self.label:
             return self.label
-        if self.json:
-            try:
-                return self.json['entities'][self.uri]['labels'][lang]['value']
-            except KeyError:
-                pass
-        json_data = self._request_json()
-        if json_data:
-            return self._get_label()
-        return None
+        
+        if not self.json:
+            self.json = self._request_json()
+        
+        entity_info = self.json.get('entities', {}).get(self.uri, {})
+        labels = entity_info.get('labels', {})
+
+        if lang == 'all':
+            self.label = {l: l_dict['value'] for l, l_dict in labels.items()}
+            return self.label
+        
+        # else :
+        self.label = labels.get(lang, {}).get('value', None)
+        return self.label
+
             
     def _get_outgoing_edges(self, include_p31=True, numeric=True):
         """
@@ -171,20 +210,36 @@ class WikidataObject:
             return None
 
     def _get_aliases(self, lang='fr'):
+        """
+        default lang = fr
+        if a language is provided,
+            returns the aliases of the item in the given language
+        if lang='all',
+            returns a dict of all aliases 
+        """
         if self.aliases:
             return self.aliases
+        
         if not self.json:
             self.json = self._request_json()
             if not self.json:
                 return None
-        
-        try:
-            aliases = [alias['value'] for alias in self.json['entities'][self.uri]['aliases'].get(lang, [])]
+            
+        entity_info = self.json.get('entities', {}).get(self.uri, {})
+        aliases_info = entity_info.get('aliases', {})
+
+        if lang == 'all':
+            aliases = {}
+            for lang, lang_aliases in aliases_info.items():
+                aliases[lang] = [alias['value'] for alias in lang_aliases]
             self.aliases = aliases
             return aliases
-        except Exception as e:
-            print('Error getting aliases:', e)
-            return None
+
+        # else :
+        lang_aliases = aliases_info.get(lang, [])
+        aliases = [alias['value'] for alias in lang_aliases]
+        self.aliases = aliases
+        return aliases
 
     def _get_coordinates(self):
         if isinstance(self.coordinates, (tuple, list)) and len(self.coordinates) == 2:
