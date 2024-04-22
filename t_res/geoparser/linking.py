@@ -455,6 +455,10 @@ class Linker:
                 config_rel = {
                     "mode": "train",
                     "model_path": os.path.join(linker_name, "model"),
+                    ##############################
+                    "keep_p_e_m": 15,
+                    "keep_ctx_ent": 5,
+                    ##############################
                 }
 
                 # Instantiate the entity disambiguation model:
@@ -476,7 +480,12 @@ class Linker:
                 config_rel = {
                     "mode": "eval",
                     "model_path": os.path.join(linker_name, "model"),
+                    ##############################
+                    "keep_p_e_m": 15,
+                    "keep_ctx_ent": 5,
+                    ##############################
                 }
+                
 
                 model = entity_disambiguation.EntityDisambiguation(
                     self.rel_params["db_embeddings"],

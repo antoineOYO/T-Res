@@ -300,7 +300,9 @@ class Pipeline:
                     place_wqid,
                 )
 
+            ############################################################
             predicted = self.mylinker.rel_params["ed_model"].predict(mentions_dataset)
+            ############################################################
 
             if self.mylinker.rel_params["with_publication"]:
                 # ... and if "publ", now remove the artificial publication entry!
